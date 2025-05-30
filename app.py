@@ -9,9 +9,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI()  # FastAPI 인스턴스 생성
+app = FastAPI()
 
-# CORS 설정
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -48,19 +47,17 @@ async def predict(player: PlayerRequest):
         if not data:
             raise HTTPException(status_code=404, detail="선수를 찾을 수 없습니다")
         
-        # 최근 경기 데이터 파싱
         def parse_array(val):
             if isinstance(val, str):
                 return [int(x) for x in val.strip('{}[]').split(',') if x.strip()]
             elif isinstance(val, list):
                 return [int(x) for x in val]
-            return []
+            return [0]*5
         
-        recent_hits = parse_array(data[5])
-        recent_hr = parse_array(data[6])
-        recent_rbi = parse_array(data[7])
+        recent_hits = parse_array(data[5]) or [0]*5
+        recent_hr = parse_array(data[6]) or [0]*5
+        recent_rbi = parse_array(data[7]) or [0]*5
 
-        # 예측 계산
         pred_avg = round(np.mean(recent_hits), 2) if recent_hits else 0.0
         pred_hr_percent = round((sum(recent_hr)/len(recent_hr))*100, 1) if recent_hr else 0.0
         pred_rbi = round(np.mean(recent_rbi), 1) if recent_rbi else 0.0

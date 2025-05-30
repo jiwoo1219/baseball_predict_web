@@ -68,7 +68,7 @@ def crawl_player(player_id):
         else:
             avg, hr, rbi = 0.0, 0, 0
 
-        # 최근 5경기 기록 (홈런: 10번째, 타점: 11번째)
+        # 최근 5경기 기록 (안타: 7번째, 홈런: 8번째, 타점: 9번째)
         recent_hits = [0]*5
         recent_hr = [0]*5
         recent_rbi = [0]*5
@@ -80,11 +80,10 @@ def crawl_player(player_id):
             temp_rbi = []
             for row in recent_table.select('tbody tr')[:5]:
                 tds = row.select('td')
-                # 컬럼 개수 충분한지 확인 (홈런/타점: 10,11번째)
-                if len(tds) >= 11:
+                if len(tds) >= 9:
                     temp_hits.append(safe_int(tds[6].text.strip()))
-                    temp_hr.append(safe_int(tds[9].text.strip()))
-                    temp_rbi.append(safe_int(tds[10].text.strip()))
+                    temp_hr.append(safe_int(tds[7].text.strip()))
+                    temp_rbi.append(safe_int(tds[8].text.strip()))
                 else:
                     temp_hits.append(0)
                     temp_hr.append(0)
@@ -142,7 +141,7 @@ def insert_player(data):
         conn.close()
 
 if __name__ == '__main__':
-    player_ids = [67449, 53123, 69737, 69102]  # 원하는 선수 ID 리스트
+    player_ids = [69102, 66131, 68345, 65011]  # 원하는 선수 ID 리스트
     for pid in player_ids:
         data = crawl_player(pid)
         if data:
