@@ -8,14 +8,14 @@ load_dotenv()
 
 def safe_int(val):
     try:
-        return int(val)
-    except:
+        return int(val.replace(',', ''))
+    except Exception:
         return 0
 
 def safe_float(val):
     try:
-        return float(val)
-    except:
+        return float(val.replace(',', ''))
+    except Exception:
         return 0.0
 
 def convert_korean_date_to_iso(korean_date):
@@ -25,8 +25,14 @@ def convert_korean_date_to_iso(korean_date):
             return date
         else:
             return None
-    except:
+    except Exception:
         return None
+
+def to_pg_array(py_list):
+    try:
+        return '{' + ','.join(map(str, py_list)) + '}'
+    except Exception:
+        return '{}'
 
 def create_pg_connection():
     return psycopg2.connect(
@@ -60,30 +66,27 @@ def crawl_player(player_id):
 
         # 성적 테이블
         stat_table = soup.select('table.tbl.tt')
+        avg, hr, rbi = 0.0, 0, 0
         if stat_table and len(stat_table) > 0:
             stat_cells = stat_table[0].select('tbody tr td')
-            avg = safe_float(stat_cells[1].text.strip()) if len(stat_cells) > 1 else 0.0
-            hr = safe_int(stat_cells[9].text.strip()) if len(stat_cells) > 9 else 0
-            rbi = safe_int(stat_cells[11].text.strip()) if len(stat_cells) > 11 else 0
-        else:
-            avg, hr, rbi = 0.0, 0, 0
+            if len(stat_cells) >= 16:
+                avg = safe_float(stat_cells[1].text.strip())
+                hr = safe_int(stat_cells[15].text.strip())   # 홈런 인덱스 15 (16번째)
+                rbi = safe_int(stat_cells[10].text.strip())  # 타점 인덱스 10 (11번째)
 
-        # 최근 5경기 기록 (안타: 7번째, 홈런: 8번째, 타점: 9번째)
+        # 최근 5경기 기록
         recent_hits = [0]*5
         recent_hr = [0]*5
         recent_rbi = [0]*5
-
         if stat_table and len(stat_table) > 2:
             recent_table = stat_table[2]
-            temp_hits = []
-            temp_hr = []
-            temp_rbi = []
+            temp_hits, temp_hr, temp_rbi = [], [], []
             for row in recent_table.select('tbody tr')[:5]:
                 tds = row.select('td')
-                if len(tds) >= 9:
-                    temp_hits.append(safe_int(tds[6].text.strip()))
-                    temp_hr.append(safe_int(tds[7].text.strip()))
-                    temp_rbi.append(safe_int(tds[8].text.strip()))
+                if len(tds) >= 16:
+                    temp_hits.append(safe_int(tds[6].text.strip()))    # 안타: 7번째(인덱스 6)
+                    temp_hr.append(safe_int(tds[15].text.strip()))    # 홈런: 16번째(인덱스 15)
+                    temp_rbi.append(safe_int(tds[10].text.strip()))   # 타점: 11번째(인덱스 10)
                 else:
                     temp_hits.append(0)
                     temp_hr.append(0)
@@ -93,6 +96,7 @@ def crawl_player(player_id):
             recent_rbi = (temp_rbi + [0]*5)[:5]
 
         return {
+            'player_id': player_id,
             'name': name,
             'birth_date': birth_date,
             'back_number': backno,
@@ -101,9 +105,9 @@ def crawl_player(player_id):
             'avg': avg,
             'hr': hr,
             'rbi': rbi,
-            'recent_hits': recent_hits,
-            'recent_hr': recent_hr,
-            'recent_rbi': recent_rbi
+            'recent_hits': to_pg_array(recent_hits),
+            'recent_hr': to_pg_array(recent_hr),
+            'recent_rbi': to_pg_array(recent_rbi),
         }
     except Exception as e:
         print(f"[{player_id}] 크롤링 실패: {str(e)}")
@@ -115,10 +119,11 @@ def insert_player(data):
     try:
         cur.execute('''
             INSERT INTO players 
-            (name, birth_date, back_number, position, team, avg, hr, rbi, recent_hits, recent_hr, recent_rbi)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (name, birth_date) DO NOTHING
+            (player_id, name, birth_date, back_number, position, team, avg, hr, rbi, recent_hits, recent_hr, recent_rbi)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (player_id) DO NOTHING
         ''', (
+            data['player_id'],
             data['name'],
             data['birth_date'] if data['birth_date'] else None,
             data['back_number'],
@@ -129,7 +134,7 @@ def insert_player(data):
             data['rbi'],
             data['recent_hits'],
             data['recent_hr'],
-            data['recent_rbi']
+            data['recent_rbi'],  # player_image 제거
         ))
         conn.commit()
         print(f"{data['name']} 저장 완료")
@@ -140,8 +145,9 @@ def insert_player(data):
         cur.close()
         conn.close()
 
+
 if __name__ == '__main__':
-    player_ids = [69102, 66131, 68345, 65011]  # 원하는 선수 ID 리스트
+    player_ids = [69102, 69737, 54529, 76232]  # 원하는 선수 ID 리스트
     for pid in player_ids:
         data = crawl_player(pid)
         if data:
