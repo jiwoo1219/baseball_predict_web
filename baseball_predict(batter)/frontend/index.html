@@ -88,9 +88,9 @@
     <script>
         async function getPrediction() {
             const name = document.getElementById('playerName').value;
-            if (!name) return alert('선수 이름을 입력하세요.');
             try {
-                const response = await fetch('http://localhost:8000/predict', {
+                // 변경 부분: localhost → Render 백엔드 주소
+                const response = await fetch('https://your-render-backend.onrender.com/predict', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: name })

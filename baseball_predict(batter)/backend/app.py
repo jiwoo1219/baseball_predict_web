@@ -13,12 +13,13 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://your-netlify-site.netlify.app"],  # 프론트엔드 주소
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+
+app.mount("/static", StaticFiles(directory="../frontend/static"), name="static")
 
 class PlayerRequest(BaseModel):
     name: str

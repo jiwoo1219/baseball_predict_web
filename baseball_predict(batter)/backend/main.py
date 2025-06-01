@@ -6,6 +6,32 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+def create_connection():
+    return psycopg2.connect(
+        host=os.getenv('DB_HOST'),
+        port=os.getenv('DB_PORT'),
+        dbname=os.getenv('DB_NAME'),
+        user=os.getenv('DB_USER'),
+        password=os.getenv('DB_PASSWORD'),
+        # 풀 모드 설정 (트랜잭션 모드)
+        connect_timeout=10,
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10
+    )
+
+# 테스트 연결
+try:
+    conn = create_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT version();")
+    print("✅ 연결 성공:", cursor.fetchone()[0])
+except Exception as e:
+    print("❌ 연결 실패:", e)
+finally:
+    if conn: conn.close()
+
+
 def safe_int(val):
     try:
         return int(val.replace(',', ''))
@@ -152,3 +178,5 @@ if __name__ == '__main__':
         data = crawl_player(pid)
         if data:
             insert_player(data)
+
+print(os.getenv('DB_HOST'))  # None이 출력되면 .env 파일 로드 실패
